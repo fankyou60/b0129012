@@ -1,0 +1,220 @@
+# Wormy (a Nibbles clone)
+# By Al Sweigart al@inventwithpython.
+# http://inventwithpython.com/pygame
+# Released under a "Simplified BSD" license
+
+import random, pygame, sys
+from pygame.locals import *
+
+更新 = 15
+寬 = 640
+高 = 480
+尺寸 = 20
+assert 寬 % 尺寸 == 0, "Window width must be a multiple of cell size."
+assert 高 % 尺寸 == 0, "Window height must be a multiple of cell size."
+寬度 = int(寬 / 尺寸)
+高度 = int(高 / 尺寸)
+
+#R    G    B
+白色的 = (255, 255, 255)
+黑色的 = (  0,   0,   0)
+紅色的 = (255,   0,   0)
+綠色的 = (  0, 255,   0)
+暗綠色 = (  0, 155,   0)
+暗灰色 = ( 40,  40,  40)
+色彩 = 黑色的
+
+大上 = '上'
+大下 = '下'
+大左 = '左'
+大右 = '右'
+
+頭 = 0 # syntactic sugar: index of the worm's 頭
+
+def main():
+    global 更新時間, 顯示, 基礎
+
+    pygame.init()
+    更新時間 = pygame.time.Clock()
+    顯示 = pygame.display.set_mode((寬, 高))
+    基礎 = pygame.font.Font('freesansbold.ttf', 18)
+    pygame.display.set_caption('Wormy')
+
+    開始幕()
+    while True:
+        跑遊戲()
+        新遊戲()
+
+
+def 跑遊戲():
+    # Set a random start point.
+    開始1 = random.randint(5, 寬度 - 6)
+    開始2 = random.randint(5, 高度 - 6)
+    蟲長度 = [{'x': 開始1,     'y': 開始2},
+                  {'x': 開始1 - 1, 'y': 開始2},
+                  {'x': 開始1 - 2, 'y': 開始2}]
+    方向 = 大右
+
+    # Start the 食物 in a random place.
+    食物 = 食物位置()
+
+    while True: # main game loop
+        for event in pygame.event.get(): # event handling loop
+            if event.type == QUIT:
+                停止()
+            elif event.type == KEYDOWN:
+                if (event.key == K_LEFT or event.key == K_a) and 方向 != 大右:
+                    方向 = 大左
+                elif (event.key == K_RIGHT or event.key == K_d) and 方向 != 大左:
+                    方向 = 大右
+                elif (event.key == K_UP or event.key == K_w) and 方向 != 大下:
+                    方向 = 大上
+                elif (event.key == K_DOWN or event.key == K_s) and 方向 != 大上:
+                    方向 = 大下
+                elif event.key == K_ESCAPE:
+                    停止()
+
+        # check if the worm has hit itself or the edge
+        if 蟲長度[頭]['x'] == -1 or 蟲長度[頭]['x'] == 寬度 or 蟲長度[頭]['y'] == -1 or 蟲長度[頭]['y'] == 高度:
+            return # game over
+        for wormBody in 蟲長度[1:]:
+            if wormBody['x'] == 蟲長度[頭]['x'] and wormBody['y'] == 蟲長度[頭]['y']:
+                return # game over
+
+        # check if worm has eaten an apply
+        if 蟲長度[頭]['x'] == 食物['x'] and 蟲長度[頭]['y'] == 食物['y']:
+            # don't remove worm's tail segment
+            食物 = 食物位置() # set a new 食物 somewhere
+        else:
+            del 蟲長度[-1] # remove worm's tail segment
+
+        # move the worm by adding a segment in the 方向 it is moving
+        if 方向 == 大上:
+            newHead = {'x': 蟲長度[頭]['x'], 'y': 蟲長度[頭]['y'] - 1}
+        elif 方向 == 大下:
+            newHead = {'x': 蟲長度[頭]['x'], 'y': 蟲長度[頭]['y'] + 1}
+        elif 方向 == 大左:
+            newHead = {'x': 蟲長度[頭]['x'] - 1, 'y': 蟲長度[頭]['y']}
+        elif 方向 == 大右:
+            newHead = {'x': 蟲長度[頭]['x'] + 1, 'y': 蟲長度[頭]['y']}
+        蟲長度.insert(0, newHead)
+        顯示.fill(色彩)
+        顯示格子()
+        蟲(蟲長度)
+        顯示食物(食物)
+        顯示分數(len(蟲長度) - 3)
+        pygame.display.update()
+        更新時間.tick(更新)
+
+def 壓縮畫面():
+    集合事件 = 基礎.render('Press a key to play.', True, 暗灰色)
+    接收事件 = 集合事件.get_rect()
+    接收事件.topleft = (寬 - 200, 高 - 30)
+    顯示.blit(集合事件, 接收事件)
+
+
+def 檢查():
+    if len(pygame.event.get(QUIT)) > 0:
+        停止()
+
+    keyUpEvents = pygame.event.get(KEYUP)
+    if len(keyUpEvents) == 0:
+        return None
+    if keyUpEvents[0].key == K_ESCAPE:
+        停止()
+    return keyUpEvents[0].key
+
+
+def 開始幕():
+    標題 = pygame.font.Font('freesansbold.ttf', 100)
+    標題破碎1 = 標題.render('Wormy!', True, 白色的, 暗綠色)
+    標題破碎2 = 標題.render('Wormy!', True, 綠色的)
+
+    速度1 = 0
+    速度2 = 0
+    while True:
+        顯示.fill(色彩)
+        轉彎 = pygame.transform.rotate(標題破碎1, 速度1)
+        收到旋轉 = 轉彎.get_rect()
+        收到旋轉.center = (寬 / 2, 高 / 2)
+        顯示.blit(轉彎, 收到旋轉)
+
+        轉彎2 = pygame.transform.rotate(標題破碎2, 速度2)
+        收到旋轉2 = 轉彎2.get_rect()
+        收到旋轉2.center = (寬 / 2, 高 / 2)
+        顯示.blit(轉彎2, 收到旋轉2)
+
+        壓縮畫面()
+
+        if 檢查():
+            pygame.event.get() # clear event queue
+            return
+        pygame.display.update()
+        更新時間.tick(更新)
+        速度1 += 3 # rotate by 3 速度 each frame
+        速度2 += 7 # rotate by 7 速度 each frame
+
+
+def 停止():
+    pygame.quit()
+    sys.exit()
+
+
+def 食物位置():
+    return {'x': random.randint(0, 寬度 - 1), 'y': random.randint(0, 高度 - 1)}
+
+
+def 新遊戲():
+    結束遊戲 = pygame.font.Font('freesansbold.ttf', 150)
+    遊戲破碎 = 結束遊戲.render('Game', True, 白色的)
+    撞擊結束 = 結束遊戲.render('Over', True, 白色的)
+    接收遊戲 = 遊戲破碎.get_rect()
+    關閉遊戲 = 撞擊結束.get_rect()
+    接收遊戲.midtop = (寬 / 2, 10)
+    關閉遊戲.midtop = (寬 / 2, 接收遊戲.height + 10 + 25)
+
+    顯示.blit(遊戲破碎, 接收遊戲)
+    顯示.blit(撞擊結束, 關閉遊戲)
+    壓縮畫面()
+    pygame.display.update()
+    pygame.time.wait(500)
+    檢查() # clear out any key presses in the event queue
+
+    while True:
+        if 檢查():
+            pygame.event.get() # clear event queue
+            return
+
+def 顯示分數(分數):
+    分數消失 = 基礎.render('分數: %s' % (分數), True, 白色的)
+    加分 = 分數消失.get_rect()
+    加分.topleft = (寬 - 120, 10)
+    顯示.blit(分數消失, 加分)
+
+
+def 蟲(蟲長度):
+    for 調動 in 蟲長度:
+        x = 調動['x'] * 尺寸
+        y = 調動['y'] * 尺寸
+        成長 = pygame.Rect(x, y, 尺寸, 尺寸)
+        pygame.draw.rect(顯示, 暗綠色, 成長)
+        真正成長 = pygame.Rect(x + 4, y + 4, 尺寸 - 8, 尺寸 - 8)
+        pygame.draw.rect(顯示, 綠色的, 真正成長)
+
+
+def 顯示食物(調動):
+    x = 調動['x'] * 尺寸
+    y = 調動['y'] * 尺寸
+    接收食物 = pygame.Rect(x, y, 尺寸, 尺寸)
+    pygame.draw.rect(顯示, 紅色的, 接收食物)
+
+
+def 顯示格子():
+    for x in range(0, 寬, 尺寸): # draw vertical lines
+        pygame.draw.line(顯示, 暗灰色, (x, 0), (x, 高))
+    for y in range(0, 高, 尺寸): # draw horizontal lines
+        pygame.draw.line(顯示, 暗灰色, (0, y), (寬, y))
+
+
+if __name__ == '__main__':
+    main()
